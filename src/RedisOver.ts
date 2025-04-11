@@ -28,7 +28,7 @@ export class RedisOver {
     return fullKey
   }
 
-  async set(key:string | object, value: any, ttl?: number): Promise<'OK'>{
+  async set(key:string | object, value: any, ttl?: number): Promise<string | null>{
     const finalKey = this.prefixKey(key);
     let result;
     if(ttl) {

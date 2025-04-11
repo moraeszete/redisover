@@ -3,7 +3,14 @@
   "version": "1.0.0",
   "description": "A class-based package extending the native Redis experience with advanced capabilities.",
   "main": "dist/index.js",                      
-  "types": "dist/index.d.ts",                   
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js", 
+      "import": "./dist/index.js",   
+      "types": "./dist/index.d.ts"
+    }
+  },                  
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
