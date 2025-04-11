@@ -5,7 +5,6 @@ declare global {
     password?: string;
     db?: number;
   }
-
 }
 
 export {};
