@@ -10,7 +10,8 @@
     "rootDir": "./src"
   },
   "include": [
-    "src/**/*"
+    "src", 
+    "src/types/index.ts"
   ],
   "exclude": [
     "node_modules",
