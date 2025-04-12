@@ -1,23 +1,25 @@
-import Redis, { RedisOptions } from "ioredis";
+import Redis, {RedisOptions} from "ioredis";
 //const redis = new RedisOver({ host: '127.0.0.1', port: 6379 }, 'myApp');
-
-type RedisOverConstructor = {
-  options?: RedisOptions;
-  prefix?: string;
-  logging?: boolean;
-}
 
 export class RedisOver {
   private client: Redis;
   private prefix?: string;
-  private logging?: boolean = false;
+  private logging: boolean;
   
   constructor(config?: RedisOverConstructor) {
+    const raw = config?.options || {};
+    const options: RedisOptions = {
+      username: raw.username?.toString() || undefined,
+      password: raw.password?.toString() || undefined,
+      host: raw.host?.toString(),
+      port: raw.port ? Number(raw.port) : 6379,
+      db:  raw.db ? Number(raw.db) : 0,
+    }
     // If a prefix is provided, set it as the key prefix for all operations
     // options like { host, port, password, db, etc.}
-    this.client = new Redis(config?.options || {});
+    this.client = new Redis(options);
     this.prefix = config?.prefix;
-    this.logging = config?.logging;
+    this.logging = config?.logging ?? false ;
   }
 
   private prefixKey(keys:string | object): any{
@@ -29,7 +31,7 @@ export class RedisOver {
   }
 
   async set(key:string | object, value: any, ttl?: number): Promise<string | null>{
-    const finalKey = this.prefixKey(key);
+    const finalKey = await this.prefixKey(key);
     let result;
     if(ttl) {
       result = await this.client.set(finalKey, JSON.stringify(value), 'EX', ttl, 'NX');

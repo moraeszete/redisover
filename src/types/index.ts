@@ -1,3 +1,5 @@
+import { RedisOptions } from 'ioredis';
+
 declare global {
   type RedisConfig = {
     host?: string;
@@ -5,7 +7,13 @@ declare global {
     password?: string;
     db?: number;
   }
+  type RedisOverConstructor = {
+    options?: RedisOptions;
+    prefix?: string;
+    logging?: boolean;
+  }
 }
+
 
 export {};
 
