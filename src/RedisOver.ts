@@ -1,4 +1,4 @@
-import Redis, {RedisOptions} from "ioredis";
+import Redis, { RedisOptions } from "ioredis";
 //const redis = new RedisOver({ host: '127.0.0.1', port: 6379 }, 'myApp');
 
 export class RedisOver {
@@ -40,7 +40,18 @@ export class RedisOver {
     }
     result = await this.client.set(finalKey, JSON.stringify(value), 'NX');
     if(result === 'OK') return result
-    throw new Error(`[RedisOver] Failed to set key: ${finalKey}`);
+    console.error(`[RedisOver] Failed to set key: ${finalKey}`);
+    return null
   }
 
+  async get(key:string | object): Promise<string | null> {
+    const finalKey = await this.prefixKey(key);
+    try {
+      let result = await this.client.get(finalKey);
+      return result ? JSON.parse(result) : null
+    } catch (er){
+      console.error(`[RedisOver] Failed to parse JSON for key: ${finalKey}`, er);
+      return null
+    }
+  }
 }
