@@ -1,4 +1,5 @@
 import { RedisOver as RedisOverClass } from './RedisOver';
+import './types/index'
 
 // Export for ESM/TS users
 export const RedisOver = RedisOverClass;
