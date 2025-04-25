@@ -44,7 +44,7 @@ export class RedisOver {
     return null
   }
 
-  async get(key:string | object): Promise<string | null> {
+  async get(key:string | object): Promise<any> {
     const finalKey = await this.prefixKey(key);
     try {
       let result = await this.client.get(finalKey);

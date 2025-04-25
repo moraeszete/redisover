@@ -1,6 +1,6 @@
 {
   "name": "redisover",
-  "version": "1.0.6",
+  "version": "1.0.8",
   "description": "A class-based package extending the native Redis experience with advanced capabilities.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
