@@ -8,6 +8,7 @@ export class RedisOver {
   
   constructor(config?: RedisOverConstructor) {
     const raw = config?.options || {};
+    
     const options: RedisOptions = {
       username: raw.username?.toString() || undefined,
       password: raw.password?.toString() || undefined,
@@ -21,7 +22,12 @@ export class RedisOver {
     this.prefix = config?.prefix;
     this.logging = config?.logging ?? false ;
   }
-
+  async _close(): Promise<void> {
+    await this.client.quit();
+  }
+  async _ping(): Promise<string> {
+    return this.client.ping();
+  }
   private prefixKey(keys:string | object): any{
     if(typeof keys === 'object'){
       keys = Object.entries(keys).map(([key, value]) => `${key}_${value}`).join(':')
