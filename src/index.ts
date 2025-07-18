@@ -10,4 +10,3 @@ if (typeof module !== 'undefined') {
   module.exports = RedisOverClass;
   // const redis = require(redisover)
 }
- 

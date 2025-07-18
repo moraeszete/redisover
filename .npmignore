@@ -1,4 +1,4 @@
-src/
 tests/
 tsconfig.json
 *.log
+*.tgz
