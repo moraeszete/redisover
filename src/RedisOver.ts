@@ -61,7 +61,7 @@ export class RedisOver {
     }
   }
 
-  async parse(keys:string | object, value: any, ttl?: number): Promise<any> {
+  async parse(keys:string | object, value: any, ttl?: number): Promise<parseType> {
     const finalkey = await this.prefixKey(keys);
     let result;
     try {

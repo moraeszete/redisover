@@ -12,6 +12,11 @@ declare global {
     prefix?: string;
     logging?: boolean;
   }
+  type parseType = {
+    created: boolean;
+    key: string;
+    value: any;
+  } | null;
 }
 
 
