@@ -1,24 +1,24 @@
-# 🚀 RedisOver
+# RedisOver
 
 [![npm version](https://badge.fury.io/js/redisover.svg)](https://badge.fury.io/js/redisover)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## 📖 Overview
+## Overview
 
 **RedisOver** is a powerful TypeScript package that extends the Redis experience with advanced capabilities built on top of [ioredis](https://github.com/luin/ioredis). It provides a clean, class-based interface that makes Redis operations more intuitive while adding features like automatic JSON serialization, key namespacing, and intelligent caching patterns.
 
-### ✨ Why RedisOver?
+### Why RedisOver?
 
-- **🔧 Type-Safe**: Full TypeScript support with comprehensive type definitions
-- **🎯 Simple API**: Clean, intuitive methods that abstract Redis complexity
-- **📦 Auto JSON**: Automatic JSON serialization and deserialization
-- **🏷️ Namespacing**: Built-in key prefixing for better organization
-- **⏰ TTL Management**: Intelligent TTL handling with smart caching
-- **🚀 Performance**: Built on the robust ioredis library
-- **🛡️ Error Handling**: Graceful error handling with detailed logging
+- **Type-Safe**: Full TypeScript support with comprehensive type definitions
+- **Simple API**: Clean, intuitive methods that abstract Redis complexity
+- **Auto JSON**: Automatic JSON serialization and deserialization
+- **Namespacing**: Built-in key prefixing for better organization
+- **TTL Management**: Intelligent TTL handling with smart caching
+- **Performance**: Built on the robust ioredis library
+- **Error Handling**: Graceful error handling with detailed logging
 
-## 📦 Installation
+## Installation
 
 Install RedisOver using your preferred package manager:
 
@@ -33,7 +33,7 @@ yarn add redisover
 pnpm add redisover
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Basic Usage
 
@@ -98,7 +98,7 @@ if (result.created) {
 }
 ```
 
-## 🔧 API Reference
+## API Reference
 
 ### Constructor
 
@@ -167,7 +167,7 @@ Closes the Redis connection.
 await redis._close();
 ```
 
-## 🎯 Advanced Examples
+## Advanced Examples
 
 ### Session Management
 
@@ -230,7 +230,7 @@ await config.set('app-settings', {
 const settings = await config.get('app-settings');
 ```
 
-## 🔍 Error Handling
+## Error Handling
 
 RedisOver includes built-in error handling and logging:
 
@@ -243,7 +243,7 @@ try {
 }
 ```
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Here's how you can help:
 
@@ -269,23 +269,23 @@ npm run build
 npm test
 ```
 
-## 📋 Requirements
+## Requirements
 
 - **Node.js**: >= 14.0.0
 - **Redis**: >= 5.0.0
 - **TypeScript**: >= 4.0.0 (for development)
 
-## 📄 License
+## License
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built on top of the excellent [ioredis](https://github.com/luin/ioredis) library
 - Inspired by the need for simpler Redis operations in TypeScript projects
 
 ---
 
-**Made with ❤️ by [Lucas Moraes](https://github.com/lucas-moraes)**
+**Made with care by [Lucas Moraes](https://github.com/lucas-moraes)**
 
-*If you find this package useful, please consider giving it a ⭐ on GitHub!*
+*If you find this package useful, please consider giving it a star on GitHub!*
