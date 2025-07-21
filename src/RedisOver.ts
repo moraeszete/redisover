@@ -49,7 +49,7 @@ export class RedisOver {
     console.error(`[RedisOver] Failed to set key: ${finalKey}`);
     return null
   }
-
+  
   async get(key:string | object): Promise<any> {
     const finalKey = await this.prefixKey(key);
     try {
@@ -58,6 +58,22 @@ export class RedisOver {
     } catch (er){
       console.error(`[RedisOver] Failed to parse JSON for key: ${finalKey}`, er);
       return null
+    }
+  }
+
+  async parse(keys:string | object, value: any, ttl?: number): Promise<any> {
+    const finalkey = await this.prefixKey(keys);
+    let result;
+    try {
+      result = await this.client.get(finalkey);
+      if(result === null) {
+        result = await this.set(keys, value, ttl ? ttl : undefined);
+        return {created: true, key: finalkey, value: JSON.parse(value)};
+      }
+      return {created: false, key: finalkey, value: JSON.parse(result)};
+    } catch (er) {
+      console.error(`[RedisOver] Failed to parse JSON for key: ${finalkey}`, er);
+      return null;
     }
   }
 }
