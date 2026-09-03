@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2019",
-    "module": "CommonJS",
+    "module": "nodenext",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -10,7 +10,7 @@
     "declaration": true,
     "outDir": "./dist",
     "lib": ["dom", "es2017"],
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "rootDir": "./src"
   },
   "include": [

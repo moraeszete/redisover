@@ -4,6 +4,17 @@
   "description": "A class-based package extending the native Redis experience with advanced capabilities.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moraeszete/redisover.git"
+  },
+  "homepage": "https://github.com/moraeszete/redisover#readme",
+  "bugs": {
+    "url": "https://github.com/moraeszete/redisover/issues"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
   "exports": {
     ".": {
       "require": "./dist/index.js",
@@ -19,7 +30,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ],
   "keywords": [
     "redis",
