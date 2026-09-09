@@ -4,7 +4,52 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A small, type-safe Redis client for Node.js/TypeScript, built on [ioredis](https://github.com/luin/ioredis). Handles JSON serialization, key prefixing and cache-or-set logic for you, so you can skip the boilerplate.
+A small, type-safe Redis client for Node.js/TypeScript, built on [ioredis](https://github.com/luin/ioredis). Its main purpose is to let multiple apps safely share the same Redis instance by automatically isolating each app's keys with a prefix. It also handles JSON serialization and cache-or-set logic, so you can skip the boilerplate.
+
+## One Redis, Multiple Apps
+
+RedisOver is especially useful when several applications share one Redis server or database. Create one `RedisOver` instance per app and give each instance its own `prefix`. Every key written by that instance is automatically namespaced, preventing collisions between apps while keeping the infrastructure simple.
+
+```mermaid
+flowchart LR
+    A[One Redis instance] --> B[RedisOver: auth-app]
+    A --> C[RedisOver: billing-app]
+    A --> D[RedisOver: notifications-app]
+
+    B --> B1[auth-app:user:123]
+    C --> C1[billing-app:user:123]
+    D --> D1[notifications-app:user:123]
+
+    classDef redis fill:#d82c20,color:#fff,stroke:#a91f16,stroke-width:2px
+    classDef app fill:#147d92,color:#fff,stroke:#0d5664,stroke-width:1px
+    classDef key fill:#f2c94c,color:#211f16,stroke:#b58d18,stroke-width:1px
+    class A redis
+    class B,C,D app
+    class B1,C1,D1 key
+```
+
+The same logical key can therefore be used by different apps without overwriting data:
+
+```typescript
+const authRedis = new RedisOver({
+  options: { host: 'localhost', port: 6379 },
+  prefix: 'auth-app',
+});
+
+const billingRedis = new RedisOver({
+  options: { host: 'localhost', port: 6379 },
+  prefix: 'billing-app',
+});
+
+await authRedis.set('user:123', { role: 'admin' });
+await billingRedis.set('user:123', { plan: 'pro' });
+
+// Stored independently as:
+// auth-app:user:123
+// billing-app:user:123
+```
+
+Use a stable, app-specific prefix such as `auth-app`, `billing-app`, or `notifications-app`. The prefix is part of the Redis key, so changing it creates a new namespace.
 
 ## Features
 
@@ -56,6 +101,8 @@ console.log(result.created ? 'value was just created' : 'value already existed',
 
 ## API Reference
 
+`key` accepts a `string` or a plain `object` (flattened into `field_value` segments) in every method above.
+
 | Method | Description |
 |---|---|
 | `new RedisOver(config?)` | `config.options` — [ioredis `RedisOptions`](https://github.com/luin/ioredis#connect-to-redis); `config.prefix` — key namespace; `config.logging` — enable logs |
@@ -64,8 +111,6 @@ console.log(result.created ? 'value was just created' : 'value already existed',
 | `parse(key, value, ttl?)` | Get existing value, or set and return a new one |
 | `_ping()` | Health check, resolves `'PONG'` |
 | `_close()` | Close the connection |
-
-`key` accepts a `string` or a plain `object` (flattened into `field_value` segments) in every method above.
 
 ## Requirements
 
