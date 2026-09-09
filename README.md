@@ -4,31 +4,17 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A small, type-safe Redis client for Node.js/TypeScript, built on [ioredis](https://github.com/luin/ioredis). Its main purpose is to let multiple apps safely share the same Redis instance by automatically isolating each app's keys with a prefix. It also handles JSON serialization and cache-or-set logic, so you can skip the boilerplate.
+A lightweight, type-safe Redis client for Node.js and TypeScript, built on top of [ioredis](https://github.com/luin/ioredis).
 
-## One Redis, Multiple Apps
+Its main job: let multiple apps safely share the same Redis instance by automatically namespacing each app's keys with a prefix. It also takes care of JSON serialization and get-or-set caching, so you write less boilerplate.
 
-RedisOver is especially useful when several applications share one Redis server or database. Create one `RedisOver` instance per app and give each instance its own `prefix`. Every key written by that instance is automatically namespaced, preventing collisions between apps while keeping the infrastructure simple.
+## Why RedisOver?
 
-```mermaid
-flowchart LR
-    A[One Redis instance] --> B[RedisOver: auth-app]
-    A --> C[RedisOver: billing-app]
-    A --> D[RedisOver: notifications-app]
+Redis doesn't know or care which app is writing to it — every app shares the same keyspace. If two apps happen to use the same key (like `user:123`), one silently overwrites the other's data.
 
-    B --> B1[auth-app:user:123]
-    C --> C1[billing-app:user:123]
-    D --> D1[notifications-app:user:123]
+RedisOver solves this by wrapping every key with an app-specific prefix. Each app ends up working in its own isolated space, even though they're all talking to the same Redis server underneath.
 
-    classDef redis fill:#d82c20,color:#fff,stroke:#a91f16,stroke-width:2px
-    classDef app fill:#147d92,color:#fff,stroke:#0d5664,stroke-width:1px
-    classDef key fill:#f2c94c,color:#211f16,stroke:#b58d18,stroke-width:1px
-    class A redis
-    class B,C,D app
-    class B1,C1,D1 key
-```
-
-The same logical key can therefore be used by different apps without overwriting data:
+![One Redis, multiple apps](./assets/redisover-architecture.svg)
 
 ```typescript
 const authRedis = new RedisOver({
@@ -49,16 +35,16 @@ await billingRedis.set('user:123', { plan: 'pro' });
 // billing-app:user:123
 ```
 
-Use a stable, app-specific prefix such as `auth-app`, `billing-app`, or `notifications-app`. The prefix is part of the Redis key, so changing it creates a new namespace.
+Pick a stable, app-specific prefix such as `auth-app`, `billing-app`, or `notifications-app`. Since the prefix is part of the key itself, changing it later effectively creates a brand-new namespace.
 
 ## Features
 
 - Full TypeScript types
-- Automatic JSON `set`/`get`
+- Automatic JSON serialization on `set`/`get`
 - Key namespacing via `prefix`
 - TTL support
-- `parse()` — get-or-set caching in one call
-- Thin layer over `ioredis`, nothing hidden
+- `parse()` — get-or-set caching in a single call
+- Thin layer over `ioredis` — nothing is hidden from you
 
 ## Install
 
@@ -82,7 +68,7 @@ const user = await redis.get('user:123'); // { name: 'John Doe', age: 30 }
 await redis._close();
 ```
 
-Keys can also be objects, which get flattened automatically:
+Keys can also be objects — they get flattened automatically:
 
 ```typescript
 await redis.set({ type: 'user', id: 123 }, { name: 'Jane Doe' });
@@ -91,7 +77,9 @@ await redis.set({ type: 'user', id: 123 }, { name: 'Jane Doe' });
 
 ## Smart Caching with `parse()`
 
-Gets the existing value for a key, or sets it (with an optional TTL) if it doesn't exist yet — in a single call:
+`parse()` checks Redis for a value first. If it's already there, you get it back as-is. If it's missing, RedisOver stores a new one for you (with an optional TTL) and returns that instead — all in a single call.
+
+![parse() decision flow](./assets/redisover-parse-flow.svg)
 
 ```typescript
 const result = await redis.parse('expensive-calc', JSON.stringify({ result: 42 }), 3600);
@@ -101,7 +89,7 @@ console.log(result.created ? 'value was just created' : 'value already existed',
 
 ## API Reference
 
-`key` accepts a `string` or a plain `object` (flattened into `field_value` segments) in every method above.
+`key` accepts a `string` or a plain `object` (flattened into `field_value` segments) in every method below.
 
 | Method | Description |
 |---|---|
