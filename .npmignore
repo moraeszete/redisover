@@ -2,3 +2,5 @@ tests/
 tsconfig.json
 *.log
 *.tgz
+
+*.local.*
