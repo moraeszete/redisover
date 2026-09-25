@@ -152,8 +152,9 @@ export class RedisOver {
    * Smart get-or-set in a single call.
    *
    * Checks Redis for the key first: if it exists, returns the cached value
-   * (`created: false`). If it doesn't, stores your `value` (with optional TTL)
-   * and returns it (`created: true`).
+   * (`created: false`). If it doesn't, stores your `value` via `set()` — so
+   * object keys are flattened and the value is JSON-serialized exactly like a
+   * direct `set()` call — and returns it (`created: true`).
    *
    * @param keys - A string key, or a plain object (flattened the same way as in `set`).
    * @param value - A JSON string to store if the key does not exist yet.

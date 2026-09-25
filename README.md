@@ -73,7 +73,9 @@ const jane = await redis.get({ type: 'user', id: 123 });
 
 ### Get-or-set in one call: `parse()`
 
-`parse()` returns the cached value if it exists — or stores yours and returns it:
+`parse()` returns the cached value if it exists — or stores yours and returns it.
+
+When storing, `parse()` uses `set()` under the hood — so the same smart handling applies: object keys are flattened (e.g. `{ type: 'user', id: 1 }` → `type_user:id_1`) and the value is JSON-serialized, exactly like a direct `set()` call.
 
 ![parse() decision flow](./assets/redisover-parse-flow.svg)
 
@@ -96,7 +98,7 @@ Every method accepts keys as a `string` **or** a plain `object` (flattened into 
 | `new RedisOver(config?)` | `config.options` — [ioredis options](https://github.com/luin/ioredis#connect-to-redis) · `config.prefix` — your project namespace · `config.logging` — enable logs |
 | `set(key, value, ttl?)` | Stores any JSON-serializable value. Returns `'OK'` or `null` |
 | `get(key)` | Returns the parsed value, or `null` if missing |
-| `parse(key, value, ttl?)` | Get-or-set: returns `{ created, key, value }` |
+| `parse(key, value, ttl?)` | Get-or-set: returns `{ created, key, value }`. Stores via `set()`, so key flattening and value serialization apply |
 | `_ping()` | Health check — resolves `'PONG'` |
 | `_close()` | Closes the connection gracefully |
 
