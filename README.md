@@ -1,18 +1,18 @@
-# RedisOver
+﻿# RedisOver
 
 [![npm version](https://badge.fury.io/js/redisover.svg)](https://www.npmjs.com/package/redisover)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A lightweight, type-safe Redis client for Node.js and TypeScript, built on top of [ioredis](https://github.com/luin/ioredis).
+**One Redis server for N projects** — with smart parsing (even for object keys) and smart set/get.
 
-Its main job: let multiple apps safely share the same Redis instance by automatically namespacing each app's keys with a prefix. It also takes care of JSON serialization and get-or-set caching, so you write less boilerplate.
+Simple, but powerful. Built on top of [ioredis](https://github.com/luin/ioredis).
 
-## Why RedisOver?
+## The idea
 
-Redis doesn't know or care which app is writing to it — every app shares the same keyspace. If two apps happen to use the same key (like `user:123`), one silently overwrites the other's data.
+Redis has a single shared keyspace. If two apps use the same key (`user:123`), one overwrites the other.
 
-RedisOver solves this by wrapping every key with an app-specific prefix. Each app ends up working in its own isolated space, even though they're all talking to the same Redis server underneath.
+RedisOver fixes that: give each project a `prefix`, and every key is automatically namespaced. All your projects can share one Redis server without ever colliding.
 
 ![One Redis, multiple apps](./assets/redisover-architecture.svg)
 
@@ -30,21 +30,10 @@ const billingRedis = new RedisOver({
 await authRedis.set('user:123', { role: 'admin' });
 await billingRedis.set('user:123', { plan: 'pro' });
 
-// Stored independently as:
+// Same Redis, zero conflicts:
 // auth-app:user:123
 // billing-app:user:123
 ```
-
-Pick a stable, app-specific prefix such as `auth-app`, `billing-app`, or `notifications-app`. Since the prefix is part of the key itself, changing it later effectively creates a brand-new namespace.
-
-## Features
-
-- Full TypeScript types
-- Automatic JSON serialization on `set`/`get`
-- Key namespacing via `prefix`
-- TTL support
-- `parse()` — get-or-set caching in a single call
-- Thin layer over `ioredis` — nothing is hidden from you
 
 ## Install
 
@@ -59,52 +48,64 @@ import { RedisOver } from 'redisover';
 
 const redis = new RedisOver({
   options: { host: 'localhost', port: 6379 },
-  prefix: 'myapp', // keys are stored as "myapp:<key>"
+  prefix: 'my-app', // every key becomes "my-app:<key>"
 });
 
+// Smart set: values are serialized to JSON automatically
 await redis.set('user:123', { name: 'John Doe', age: 30 }, 60); // TTL: 60s
+
+// Smart get: values come back already parsed
 const user = await redis.get('user:123'); // { name: 'John Doe', age: 30 }
 
 await redis._close();
 ```
 
-Keys can also be objects — they get flattened automatically:
+### Object keys? No problem
+
+Keys don't have to be strings — pass an object and RedisOver flattens it for you:
 
 ```typescript
 await redis.set({ type: 'user', id: 123 }, { name: 'Jane Doe' });
-// stored under "myapp:type_user:id_123"
+// stored as "my-app:type_user:id_123"
+
+const jane = await redis.get({ type: 'user', id: 123 });
 ```
 
-## Smart Caching with `parse()`
+### Get-or-set in one call: `parse()`
 
-`parse()` checks Redis for a value first. If it's already there, you get it back as-is. If it's missing, RedisOver stores a new one for you (with an optional TTL) and returns that instead — all in a single call.
+`parse()` returns the cached value if it exists — or stores yours and returns it:
 
 ![parse() decision flow](./assets/redisover-parse-flow.svg)
 
 ```typescript
-const result = await redis.parse('expensive-calc', JSON.stringify({ result: 42 }), 3600);
+const result = await redis.parse('report', JSON.stringify({ total: 42 }), 3600);
 
-console.log(result.created ? 'value was just created' : 'value already existed', result.value);
+if (result?.created) {
+  console.log('cached now:', result.value);
+} else {
+  console.log('already cached:', result.value);
+}
 ```
 
-## API Reference
+## API
 
-`key` accepts a `string` or a plain `object` (flattened into `field_value` segments) in every method below.
+Every method accepts keys as a `string` **or** a plain `object` (flattened into `field_value` segments).
 
-| Method | Description |
+| Method | What it does |
 |---|---|
-| `new RedisOver(config?)` | `config.options` — [ioredis `RedisOptions`](https://github.com/luin/ioredis#connect-to-redis); `config.prefix` — key namespace; `config.logging` — enable logs |
-| `set(key, value, ttl?)` | Store a JSON-serialized value. Returns `'OK'` or `null` |
-| `get(key)` | Retrieve and parse a value, or `null` if missing |
-| `parse(key, value, ttl?)` | Get existing value, or set and return a new one |
-| `_ping()` | Health check, resolves `'PONG'` |
-| `_close()` | Close the connection |
+| `new RedisOver(config?)` | `config.options` — [ioredis options](https://github.com/luin/ioredis#connect-to-redis) · `config.prefix` — your project namespace · `config.logging` — enable logs |
+| `set(key, value, ttl?)` | Stores any JSON-serializable value. Returns `'OK'` or `null` |
+| `get(key)` | Returns the parsed value, or `null` if missing |
+| `parse(key, value, ttl?)` | Get-or-set: returns `{ created, key, value }` |
+| `_ping()` | Health check — resolves `'PONG'` |
+| `_close()` | Closes the connection gracefully |
+
+> Tip: hover any method in your editor — everything is documented with JSDoc, examples included.
 
 ## Requirements
 
 - Node.js >= 14
 - Redis >= 5
-- TypeScript >= 4 (optional, for typed usage)
 
 ## Contributing
 
