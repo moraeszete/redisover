@@ -7,6 +7,11 @@ declare global {
     password?: string;
     db?: number;
   }
+  /**
+   * Constructor options for the RedisOver class.
+   * 
+   * @property prefix - Namespace prefix for all Redis keys managed by this instance.
+   */
   type RedisOverConstructor = {
     options?: RedisOptions;
     prefix?: string;

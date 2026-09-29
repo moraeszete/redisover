@@ -31,6 +31,13 @@ export class RedisOver {
     return this.client.ping();
   }
 
+  /**
+   * Builds the key-matching pattern for this instance's namespace.
+   */
+  private prefixPattern(): string {
+    return this.prefix ? `${this.prefix}:*` : '*';
+  }
+
   private prefixKey(keys:string | object): any{
     if(typeof keys === 'object'){
       keys = Object.entries(keys).map(([key, value]) => `${key}_${value}`).join(':')
@@ -137,9 +144,10 @@ export class RedisOver {
   }
 
   /**
-   * 
-   * @param key The key to delete from Redis.
-   * @returns `true` if the key was deleted, `false` otherwise.
+   * Deletes a single key from Redis.
+   *
+   * @param key - The key to delete (string or plain object, flattened like in `set`).
+   * @returns `true` if the key was deleted, `false` if it did not exist.
    */
   async deleteKey(key:string | object): Promise<boolean> {
     const finalKey = this.prefixKey(key);
@@ -148,25 +156,43 @@ export class RedisOver {
   }
 
   /**
-   * 
-   * @returns `true` if any keys were deleted, `false` otherwise.
+   * Deletes **all** keys in this instance's namespace (matching `"<prefix>:*"` pattern).
+   *
+   * Uses non-blocking iteration, deleting in batches.
+   * If there is no prefix, this wipes every key in the current DB.
+   *
+   * @returns `true` if at least one key was deleted, `false` otherwise.
    */
   async clear(): Promise<boolean> {
-    const temp = await this.client.del(await this.client.keys(`${this.prefix}*`));
-    if (temp > 0) return true
-    return false
+    let deleted = 0;
+    let cursor = '0';
+    do {
+      const [next, batch] = await this.client.scan(cursor, 'MATCH', this.prefixPattern(), 'COUNT', 100);
+      cursor = next;
+      if (batch.length > 0) deleted += await this.client.del(...batch);
+    } while (cursor !== '0');
+    return deleted > 0;
   }
 
   /**
-   * @returns An array of all keys in Redis that match the current prefix.
+   * Lists all keys in this instance's namespace (matching `"<prefix>:*"` pattern).
+   * @returns An array with every key under the current prefix.
    */
   async keys(): Promise<string[]> {
-    return await this.client.keys(`${this.prefix}*`);
+    const found: string[] = [];
+    let cursor = '0';
+    do {
+      const [next, batch] = await this.client.scan(cursor, 'MATCH', this.prefixPattern(), 'COUNT', 100);
+      cursor = next;
+      found.push(...batch);
+    } while (cursor !== '0');
+    return found;
   }
 
   /**
-   * 
-   * @param key The key to check for existence in Redis.
+   * Checks whether a key exists in Redis.
+   *
+   * @param key - The key to check (string or plain object).
    * @returns `true` if the key exists, `false` otherwise.
    */
   async exists(key:string | object): Promise<boolean> {
