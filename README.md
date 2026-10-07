@@ -14,7 +14,7 @@ Redis has a single shared keyspace. If two apps use the same key (`user:123`), o
 
 RedisOver fixes that: give each project a `prefix`, and every key is automatically namespaced. All your projects can share one Redis server without ever colliding.
 
-![One Redis, multiple apps](assets\architecture.svg)
+![One Redis, multiple apps](./assets/architecture.svg)
 
 ```typescript
 const authRedis = new RedisOver({
@@ -77,7 +77,7 @@ const jane = await redis.get({ type: 'user', id: 123 });
 
 When storing, `parse()` uses `get()` and `set()`, in this order, under the hood — so the same smart handling applies: object keys are flattened (e.g. `{ type: 'user', id: 1 }` → `type_user:id_1`) and the value is JSON-serialized, exactly like a direct `set()` call.
 
-![getOrSet flow](assets\getOrSet-flowchart.svg)
+![getOrSet flow](./assets/getOrSet-flowchart.svg)
 
 ```typescript
 const result = await redis.parse('report', JSON.stringify({ total: 42 }), 3600);
