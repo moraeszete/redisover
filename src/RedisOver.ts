@@ -120,10 +120,6 @@ export class RedisOver {
       if(result === 'OK') return result
       // If the key already exists, update the value without changing the TTL
     }
-    result = await this.client.set(finalKey, JSON.stringify(value), 'NX');
-    if(result === 'OK') return result
-    console.error(`[RedisOver] Failed to set key: ${finalKey}`);
-    return null
   }
   
   /**
@@ -146,7 +142,24 @@ export class RedisOver {
       console.error(`[RedisOver] Failed to parse JSON for key: ${finalKey}`, er);
       return null
     }
+
+    if (result === 'OK') return result;
+    if (this.logging) console.error(`[RedisOver] Set skipped or failed for key: ${finalKey}`);
+    return null;
   }
+  
+  /**
+   * Retrieves a value from Redis, validating it is JSON-parseable first.
+   *
+   * @typeParam T - Expected shape of the stored value (defaults to `any`).
+   * @param key - A string key, or a plain object (flattened).
+   * @returns The parsed value typed as `T`, or `null` if the key is missing or the stored value is not valid JSON.
+   *
+   */
+  async get<T = any>(key:string | object): Promise<T | null> {
+    const finalKey = this.prefixKey(key);
+    const result = await this.client.get(finalKey);
+    if (result === null) return null;
 
   /**
    * Smart get-or-set in a single call.
@@ -182,5 +195,95 @@ export class RedisOver {
       console.error(`[RedisOver] Failed to parse JSON for key: ${finalkey}`, er);
       return null;
     }
+    return parsed.value;
+  }
+
+  /**
+   * Checks Redis first and validates the cached value is JSON-parseable:
+   * - **Hit (valid JSON)**: returns the cached value.
+   * - **Hit (corrupt/unparseable)**: treated as a miss - value is overwritten.
+   * - **Miss**: runs `fn()`, stores the result via (with optional TTL), and returns it.
+   *
+   * Errors thrown by `fn` propagate to the caller — nothing is cached in that case.
+   *
+   * @param key - A string key, or a plain object (flattened).
+   * @param fn - Factory that produces the value on cache miss (e.g. an expensive DB query). Only executed when needed.
+   * @param ttl - Optional time-to-live in seconds, applied only when the value is created.
+   * @returns The cached value on hit, or the fresh value produced by `fn` on miss.
+   *
+   */
+  async getOrSet<T = any>(key:string | object, fn: () => Promise<T> | T, ttl?: number): Promise<T> {
+    const finalKey = this.prefixKey(key);
+    const cached = await this.client.get(finalKey);
+
+    if (cached !== null) {
+      const parsed = this.safeParse(cached);
+      if (parsed.ok) return parsed.value as T;
+
+      // Corrupt value: treat as a miss — set() overwrites it below
+      console.error(`[RedisOver] Cached value is not valid JSON for key: ${finalKey} — regenerating`);
+    }
+
+    const fresh = await fn(); // MISS: run the expensive factory
+    await this.set(key, fresh, ttl);
+    return fresh;
+  }
+
+  /**
+   * Deletes a single key from Redis.
+   *
+   * @param key - The key to delete (string or plain object, flattened like in `set`).
+   * @returns `true` if the key was deleted, `false` if it did not exist.
+   */
+  async deleteKey(key:string | object): Promise<boolean> {
+    const finalKey = this.prefixKey(key);
+    const result = await this.client.del(finalKey);
+    return result > 0;
+  }
+
+  /**
+   * Deletes **all** keys in this instance's namespace (matching `"<prefix>:*"` pattern).
+   *
+   * Uses non-blocking iteration, deleting in batches.
+   * If there is no prefix, this wipes every key in the current DB.
+   *
+   * @returns `true` if at least one key was deleted, `false` otherwise.
+   */
+  async clear(): Promise<boolean> {
+    let deleted = 0;
+    let cursor = '0';
+    do {
+      const [next, batch] = await this.client.scan(cursor, 'MATCH', this.prefixPattern(), 'COUNT', 100);
+      cursor = next;
+      if (batch.length > 0) deleted += await this.client.del(...batch);
+    } while (cursor !== '0');
+    return deleted > 0;
+  }
+
+  /**
+   * Lists all keys in this instance's namespace (matching `"<prefix>:*"` pattern).
+   * @returns An array with every key under the current prefix.
+   */
+  async keys(): Promise<string[]> {
+    const found: string[] = [];
+    let cursor = '0';
+    do {
+      const [next, batch] = await this.client.scan(cursor, 'MATCH', this.prefixPattern(), 'COUNT', 100);
+      cursor = next;
+      found.push(...batch);
+    } while (cursor !== '0');
+    return found;
+  }
+
+  /**
+   * Checks whether a key exists in Redis.
+   *
+   * @param key - The key to check (string or plain object).
+   * @returns `true` if the key exists, `false` otherwise.
+   */
+  async exists(key:string | object): Promise<boolean> {
+    const finalKey = this.prefixKey(key);
+    const result = await this.client.exists(finalKey);
+    return result > 0;
   }
 }

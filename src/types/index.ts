@@ -7,30 +7,20 @@ declare global {
     password?: string;
     db?: number;
   }
+  /**
+   * Constructor options for the RedisOver class.
+   * 
+   * @property prefix - Namespace prefix for all Redis keys managed by this instance.
+   */
   type RedisOverConstructor = {
     options?: RedisOptions;
     prefix?: string;
     logging?: boolean;
   }
-  type parseType = {
-    created: boolean;
-    key: string;
-    value: any;
-  } | null;
+  type SafeParse = {
+    ok: boolean; 
+    value: any 
+  }
 }
 
-
 export {};
-
-// export interface KeyValue {
-//   key: string;
-//   value: string | object;
-// }
-
-// export interface RedisCommandResponse {
-//   success: boolean;
-//   data?: any;
-//   error?: string;
-// }
-
-// export type JSONValue = string | number | boolean | null | JSONValue[] | { [key: string]: JSONValue };

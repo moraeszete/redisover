@@ -1,6 +1,6 @@
 {
   "name": "redisover",
-  "version": "1.1.17",
+  "version": "2.0.1",
   "description": "A class-based package extending the native Redis experience with advanced capabilities.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -44,10 +44,10 @@
   "author": "Lucas Moraes",
   "license": "MIT",
   "dependencies": {
-    "ioredis": "^5.6.1"
+    "ioredis": "^6.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.14.1",
-    "typescript": "^4.9.5"
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2"
   }
 }

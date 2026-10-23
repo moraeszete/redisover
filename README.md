@@ -14,7 +14,7 @@ Redis has a single shared keyspace. If two apps use the same key (`user:123`), o
 
 RedisOver fixes that: give each project a `prefix`, and every key is automatically namespaced. All your projects can share one Redis server without ever colliding.
 
-![One Redis, multiple apps](./assets/redisover-architecture.svg)
+![One Redis, multiple apps](./assets/architecture.svg)
 
 ```typescript
 const authRedis = new RedisOver({
