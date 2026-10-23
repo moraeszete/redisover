@@ -111,7 +111,7 @@ Every method accepts keys as a `string` **or** a plain `object` (flattened into 
 
 ## Requirements
 
-- Node.js >= 14.0.0
+- Node.js >= 14
 - Redis >= 5
 
 ## Contributing
