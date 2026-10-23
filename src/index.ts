@@ -8,5 +8,7 @@ export default RedisOverClass;
 // Export for CommonJS users
 if (typeof module !== 'undefined') {
   module.exports = RedisOverClass;
+  module.exports.RedisOver = RedisOverClass;
+  module.exports.default = RedisOverClass;
   // const redis = require(redisover)
 }
