@@ -1,11 +1,43 @@
 import Redis, { RedisOptions } from "ioredis";
-//const redis = new RedisOver({ host: '127.0.0.1', port: 6379 }, 'myApp');
 
+/**
+ * A smart Redis client that lets multiple projects share a single Redis server.
+ *
+ * Every key is automatically namespaced with your app's `prefix`, values are
+ * JSON-serialized/parsed transparently, and keys can even be plain objects.
+ *
+ * @example
+ * ```typescript
+ * const redis = new RedisOver({
+ *   options: { host: 'localhost', port: 6379 },
+ *   prefix: 'my-app', // keys become "my-app:<key>"
+ * });
+ *
+ * await redis.set('user:123', { name: 'John' }, 60);
+ * const user = await redis.get('user:123'); // { name: 'John' }
+ * ```
+ */
 export class RedisOver {
   private client: Redis;
   private prefix?: string;
   private logging: boolean;
 
+  /**
+   * Creates a new RedisOver client and connects to Redis.
+   *
+   * @param config - Optional configuration object.
+   * @param config.options - Standard ioredis connection options (`host`, `port`, `username`, `password`, `db`).
+   * @param config.prefix - Namespace prepended to every key as `"<prefix>:<key>"`. Use a unique prefix per project to safely share one Redis server.
+   * @param config.logging - Enables internal logging. Defaults to `false`.
+   *
+   * @example
+   * ```typescript
+   * const redis = new RedisOver({
+   *   options: { host: '127.0.0.1', port: 6379 },
+   *   prefix: 'auth-app',
+   * });
+   * ```
+   */
   constructor(config?: RedisOverConstructor) {
     const raw = config?.options || {};
     
@@ -22,22 +54,38 @@ export class RedisOver {
     this.prefix = config?.prefix;
     this.logging = config?.logging ?? false ;
   }
-
+  /**
+   * Gracefully closes the connection to Redis.
+   *
+   * Call this when your app shuts down to release the connection.
+   *
+   * @example
+   * ```typescript
+   * await redis._close();
+   * ```
+   */
   async _close(): Promise<void> {
     await this.client.quit();
   }
 
+  /**
+   * Health check — verifies the connection to Redis is alive.
+   *
+   * @returns Resolves with `'PONG'` if Redis is reachable.
+   *
+   * @example
+   * ```typescript
+   * const pong = await redis._ping(); // 'PONG'
+   * ```
+   */
   async _ping(): Promise<string> {
     return this.client.ping();
   }
 
   /**
-   * Builds the key-matching pattern for this instance's namespace.
+   * Builds the final Redis key: flattens object keys into `field_value`
+   * segments and prepends the configured prefix.
    */
-  private prefixPattern(): string {
-    return this.prefix ? `${this.prefix}:*` : '*';
-  }
-
   private prefixKey(keys:string | object): any{
     if(typeof keys === 'object'){
       keys = Object.entries(keys).map(([key, value]) => `${key}_${value}`).join(':')
@@ -47,43 +95,52 @@ export class RedisOver {
   }
 
   /**
-   * Safely validates and parses a raw Redis string with `JSON.parse`.
+   * Stores a value in Redis, automatically serialized to JSON.
    *
-   * @returns `{ ok: true, value }` when parseable, `{ ok: false, value: null }` otherwise.
+   * The key is namespaced with your prefix. If the key is an object, it is
+   * flattened into `field_value` segments (e.g. `{ type: 'user', id: 1 }`
+   * becomes `"type_user:id_1"`).
+   *
+   * @param key - A string key, or a plain object to be flattened into a key.
+   * @param value - Any JSON-serializable value (object, array, string, number...).
+   * @param ttl - Optional time-to-live in seconds. Omit for no expiration.
+   * @returns `'OK'` on success, or `null` if the key could not be set.
+   *
+   * @example
+   * ```typescript
+   * await redis.set('user:123', { name: 'John' }, 60); // expires in 60s
+   * await redis.set({ type: 'user', id: 123 }, { name: 'Jane' }); // object key
+   * ```
    */
-  private safeParse(raw: string): SafeParse {
-    try {
-      return { ok: true, value: JSON.parse(raw) };
-    } catch {
-      return { ok: false, value: null };
+  async set(key:string | object, value: any, ttl?: number): Promise<string | null>{
+    const finalKey = await this.prefixKey(key);
+    let result;
+    if(ttl) {
+      result = await this.client.set(finalKey, JSON.stringify(value), 'EX', ttl, 'NX');
+      if(result === 'OK') return result
+      // If the key already exists, update the value without changing the TTL
     }
   }
-
+  
   /**
-   * Stores a JSON-serialized value in Redis. **Overwrites existing keys by default.**
+   * Retrieves a value from Redis, automatically parsed from JSON.
    *
-   * Set `onlyIfNew: true` to only write when the key does not exist yet (Redis `NX`). If `false` or omitted, the key value is overwritten.
+   * @param key - A string key, or a plain object (flattened the same way as in `set`).
+   * @returns The parsed value (object, array, etc.), or `null` if the key does not exist or parsing fails.
    *
-   * @param key - A string key, or a plain object flattened into `field_value` segments.
-   * @param value - Any JSON-serializable value.
-   * @param ttl - Optional time-to-live in seconds. Omit for no expiration.
-   * @param onlyIfNew - Defaults to `false`.
-   * @returns `'OK'` on success, or `null` if the write was skipped (`onlyIfNew` and key exists) or failed.
-   *
+   * @example
+   * ```typescript
+   * const user = await redis.get('user:123'); // { name: 'John' } or null
+   * ```
    */
-  async set(key:string | object, value: any, ttl?: number, onlyIfNew: boolean = false): Promise<string | null>{
-    const finalKey = this.prefixKey(key);
-    const payload = JSON.stringify(value);
-    let result: string | null;
-
-    if (ttl && onlyIfNew) {
-      result = await this.client.set(finalKey, payload, 'EX', ttl, 'NX');
-    } else if (ttl) {
-      result = await this.client.set(finalKey, payload, 'EX', ttl);
-    } else if (onlyIfNew) {
-      result = await this.client.set(finalKey, payload, 'NX');
-    } else {
-      result = await this.client.set(finalKey, payload);
+  async get(key:string | object): Promise<any> {
+    const finalKey = await this.prefixKey(key);
+    try {
+      let result = await this.client.get(finalKey);
+      return result ? JSON.parse(result) : null
+    } catch (er){
+      console.error(`[RedisOver] Failed to parse JSON for key: ${finalKey}`, er);
+      return null
     }
 
     if (result === 'OK') return result;
@@ -104,9 +161,38 @@ export class RedisOver {
     const result = await this.client.get(finalKey);
     if (result === null) return null;
 
-    const parsed = this.safeParse(result);
-    if (!parsed.ok) {
-      console.error(`[RedisOver] Cached value is not valid JSON for key: ${finalKey}`);
+  /**
+   * Smart get-or-set in a single call.
+   *
+   * Checks Redis for the key first: if it exists, returns the cached value
+   * (`created: false`). If it doesn't, stores your `value` via `set()` — so
+   * object keys are flattened and the value is JSON-serialized exactly like a
+   * direct `set()` call — and returns it (`created: true`).
+   *
+   * @param keys - A string key, or a plain object (flattened the same way as in `set`).
+   * @param value - A JSON string to store if the key does not exist yet.
+   * @param ttl - Optional time-to-live in seconds, applied only when the value is created.
+   * @returns `{ created, key, value }` — `created` tells you whether the value was just stored or already existed. Returns `null` on parsing errors.
+   *
+   * @example
+   * ```typescript
+   * const result = await redis.parse('report', JSON.stringify({ total: 42 }), 3600);
+   * if (result?.created) console.log('cached now:', result.value);
+   * else console.log('already cached:', result?.value);
+   * ```
+   */
+  async parse(keys:string | object, value: any, ttl?: number): Promise<parseType> {
+    const finalkey = await this.prefixKey(keys);
+    let result;
+    try {
+      result = await this.client.get(finalkey);
+      if(result === null) {
+        result = await this.set(keys, value, ttl ? ttl : undefined);
+        return {created: true, key: finalkey, value: JSON.parse(value)};
+      }
+      return {created: false, key: finalkey, value: JSON.parse(result)};
+    } catch (er) {
+      console.error(`[RedisOver] Failed to parse JSON for key: ${finalkey}`, er);
       return null;
     }
     return parsed.value;
