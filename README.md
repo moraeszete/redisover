@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**One Redis server for N projects** — with smart parsing (even for object keys) and smart set/get.
+**One Redis server for N projects** — with namespaced keys, JSON serialization, and cache helpers.
 
 Simple, but powerful. Built on top of [ioredis](https://github.com/luin/ioredis).
 
@@ -73,22 +73,17 @@ const jane = await redis.get({ type: 'user', id: 123 });
 
 ### Get-or-set in one call: `getOrSet()`
 
-`getOrSet()` returns the cached value if it exists — otherwise it calls your factory, stores the result, and returns it. The factory can be synchronous or asynchronous and only runs on a cache miss (or invalid cached JSON).
-
-Object keys are flattened (e.g. `{ type: 'user', id: 1 }` → `type_user:id_1`) and factory results are JSON-serialized by `set()`. Pass the value itself, without calling `JSON.stringify()`.
-
-![getOrSet flow](./assets/getOrSet-flowchart.svg)
+`getOrSet()` checks Redis first. On a cache hit, it returns the parsed value without running the factory. On a miss, it calls the factory, stores its result, and returns it:
 
 ```typescript
-const result = await redis.getOrSet('report', () => ({ total: 42 }), 3600);
-console.log(result); // { total: 42 }
-
-// On a cache hit, the factory is not called and the existing TTL is unchanged.
-const cached = await redis.getOrSet('report', () => ({ total: 99 }), 3600);
-console.log(cached); // { total: 42 }
+const report = await redis.getOrSet(
+  'report',
+  async () => ({ total: 42 }),
+  3600, // optional TTL in seconds, applied when the value is created
+);
 ```
 
-Upgrading from 1.x? `parse()` was removed in 2.0. Use `getOrSet()` with a factory instead. It returns the value directly, not the former `{ created, key, value }` wrapper. Factory errors propagate without caching a result.
+If a cached value is not valid JSON, `getOrSet()` treats it as a miss and replaces it with the factory result. Errors thrown by the factory are passed to the caller and are not cached.
 
 ## API
 
@@ -96,16 +91,18 @@ Every method accepts keys as a `string` **or** a plain `object` (flattened into 
 
 | Method | What it does |
 |---|---|
-| `new RedisOver(config?)` | `config.options` — [ioredis options](https://github.com/luin/ioredis#connect-to-redis) · `config.prefix` — your project namespace · `config.logging` — enable logs |
-| `set(key, value, ttl?, onlyIfNew?)` | Stores any JSON-serializable value. Returns `'OK'` or `null`; `onlyIfNew: true` skips a key that already exists |
-| `get(key)` | Returns the parsed value, or `null` if missing |
-| `getOrSet(key, factory, ttl?)` | Returns a cached value, or calls the factory, stores its result, and returns that value |
-| `deleteKey(key)` | Deletes one key. Returns whether a key was deleted |
-| `exists(key)` | Returns whether the key exists |
-| `keys()` | Lists fully prefixed keys in this instance's namespace |
-| `clear()` | Deletes keys in this instance's namespace. Without a prefix, deletes all keys in the selected Redis database |
+| `new RedisOver(config?)` | Connects to Redis. `config.options` accepts [ioredis connection options](https://github.com/luin/ioredis#connect-to-redis); `config.prefix` namespaces this instance's keys; `config.logging` enables a diagnostic when a `set()` is skipped |
+| `set(key, value, ttl?, onlyIfNew?)` | JSON-serializes and stores a value; `ttl` is in seconds. Overwrites by default; pass `true` for `onlyIfNew` to use Redis `NX`. Returns `'OK'` or `null` if the write was skipped |
+| `get<T>(key)` | Returns the JSON-parsed value (typed as `T`), or `null` if missing or invalid JSON |
+| `getOrSet<T>(key, fn, ttl?)` | Returns a valid cached value, or calls `fn`, caches its result, and returns it. `fn` can be synchronous or asynchronous |
+| `deleteKey(key)` | Deletes one key; returns `true` if it existed |
+| `exists(key)` | Checks whether one key exists |
+| `keys()` | Lists keys matching this instance's namespace |
+| `clear()` | Deletes keys matching this instance's namespace using `SCAN`. Returns `true` if anything was deleted |
 | `_ping()` | Health check — resolves `'PONG'` |
 | `_close()` | Closes the connection gracefully |
+
+`clear()` without a `prefix` matches `*` and deletes **all keys in the selected Redis database**. Use a prefix when sharing a database with other applications.
 
 > Tip: hover any method in your editor — everything is documented with JSDoc, examples included.
 
