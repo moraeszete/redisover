@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**One Redis server for N projects** — with smart parsing (even for object keys) and smart set/get.
+**One Redis server for N projects** — with namespaced keys, JSON serialization, and cache helpers.
 
 Simple, but powerful. Built on top of [ioredis](https://github.com/luin/ioredis).
 
@@ -71,23 +71,19 @@ await redis.set({ type: 'user', id: 123 }, { name: 'Jane Doe' });
 const jane = await redis.get({ type: 'user', id: 123 });
 ```
 
-### Get-or-set in one call: `parse()`
+### Get-or-set in one call: `getOrSet()`
 
-`parse()` returns the cached value if it exists — or stores yours and returns it.
-
-When storing, `parse()` uses `get()` and `set()`, in this order, under the hood — so the same smart handling applies: object keys are flattened (e.g. `{ type: 'user', id: 1 }` → `type_user:id_1`) and the value is JSON-serialized, exactly like a direct `set()` call.
-
-![getOrSet flow](./assets/getOrSet-flowchart.svg)
+`getOrSet()` checks Redis first. On a cache hit, it returns the parsed value without running the factory. On a miss, it calls the factory, stores its result, and returns it:
 
 ```typescript
-const result = await redis.parse('report', JSON.stringify({ total: 42 }), 3600);
-
-if (result?.created) {
-  console.log('cached now:', result.value);
-} else {
-  console.log('already cached:', result.value);
-}
+const report = await redis.getOrSet(
+  'report',
+  async () => ({ total: 42 }),
+  3600, // optional TTL in seconds, applied when the value is created
+);
 ```
+
+If a cached value is not valid JSON, `getOrSet()` treats it as a miss and replaces it with the factory result. Errors thrown by the factory are passed to the caller and are not cached.
 
 ## API
 
@@ -95,12 +91,18 @@ Every method accepts keys as a `string` **or** a plain `object` (flattened into 
 
 | Method | What it does |
 |---|---|
-| `new RedisOver(config?)` | `config.options` — [ioredis options](https://github.com/luin/ioredis#connect-to-redis) · `config.prefix` — your project namespace · `config.logging` — enable logs |
-| `set(key, value, ttl?)` | Stores any JSON-serializable value. Returns `'OK'` or `null` |
-| `get(key)` | Returns the parsed value, or `null` if missing |
-| `parse(key, value, ttl?)` | Get-or-set: returns `{ created, key, value }`. Stores via `set()`, so key flattening and value serialization apply |
+| `new RedisOver(config?)` | Connects to Redis. `config.options` accepts [ioredis connection options](https://github.com/luin/ioredis#connect-to-redis); `config.prefix` namespaces this instance's keys; `config.logging` enables a diagnostic when a `set()` is skipped |
+| `set(key, value, ttl?, onlyIfNew?)` | JSON-serializes and stores a value; `ttl` is in seconds. Overwrites by default; pass `true` for `onlyIfNew` to use Redis `NX`. Returns `'OK'` or `null` if the write was skipped |
+| `get<T>(key)` | Returns the JSON-parsed value (typed as `T`), or `null` if missing or invalid JSON |
+| `getOrSet<T>(key, fn, ttl?)` | Returns a valid cached value, or calls `fn`, caches its result, and returns it. `fn` can be synchronous or asynchronous |
+| `deleteKey(key)` | Deletes one key; returns `true` if it existed |
+| `exists(key)` | Checks whether one key exists |
+| `keys()` | Lists keys matching this instance's namespace |
+| `clear()` | Deletes keys matching this instance's namespace using `SCAN`. Returns `true` if anything was deleted |
 | `_ping()` | Health check — resolves `'PONG'` |
 | `_close()` | Closes the connection gracefully |
+
+`clear()` without a `prefix` matches `*` and deletes **all keys in the selected Redis database**. Use a prefix when sharing a database with other applications.
 
 > Tip: hover any method in your editor — everything is documented with JSDoc, examples included.
 
