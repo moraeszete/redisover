@@ -71,23 +71,24 @@ await redis.set({ type: 'user', id: 123 }, { name: 'Jane Doe' });
 const jane = await redis.get({ type: 'user', id: 123 });
 ```
 
-### Get-or-set in one call: `parse()`
+### Get-or-set in one call: `getOrSet()`
 
-`parse()` returns the cached value if it exists — or stores yours and returns it.
+`getOrSet()` returns the cached value if it exists — otherwise it calls your factory, stores the result, and returns it. The factory can be synchronous or asynchronous and only runs on a cache miss (or invalid cached JSON).
 
-When storing, `parse()` uses `set()` under the hood — so the same smart handling applies: object keys are flattened (e.g. `{ type: 'user', id: 1 }` → `type_user:id_1`) and the value is JSON-serialized, exactly like a direct `set()` call.
+Object keys are flattened (e.g. `{ type: 'user', id: 1 }` → `type_user:id_1`) and factory results are JSON-serialized by `set()`. Pass the value itself, without calling `JSON.stringify()`.
 
-![parse() decision flow](./assets/redisover-parse-flow.svg)
+![getOrSet flow](./assets/getOrSet-flowchart.svg)
 
 ```typescript
-const result = await redis.parse('report', JSON.stringify({ total: 42 }), 3600);
+const result = await redis.getOrSet('report', () => ({ total: 42 }), 3600);
+console.log(result); // { total: 42 }
 
-if (result?.created) {
-  console.log('cached now:', result.value);
-} else {
-  console.log('already cached:', result.value);
-}
+// On a cache hit, the factory is not called and the existing TTL is unchanged.
+const cached = await redis.getOrSet('report', () => ({ total: 99 }), 3600);
+console.log(cached); // { total: 42 }
 ```
+
+Upgrading from 1.x? `parse()` was removed in 2.0. Use `getOrSet()` with a factory instead. It returns the value directly, not the former `{ created, key, value }` wrapper. Factory errors propagate without caching a result.
 
 ## API
 
@@ -96,9 +97,13 @@ Every method accepts keys as a `string` **or** a plain `object` (flattened into 
 | Method | What it does |
 |---|---|
 | `new RedisOver(config?)` | `config.options` — [ioredis options](https://github.com/luin/ioredis#connect-to-redis) · `config.prefix` — your project namespace · `config.logging` — enable logs |
-| `set(key, value, ttl?)` | Stores any JSON-serializable value. Returns `'OK'` or `null` |
+| `set(key, value, ttl?, onlyIfNew?)` | Stores any JSON-serializable value. Returns `'OK'` or `null`; `onlyIfNew: true` skips a key that already exists |
 | `get(key)` | Returns the parsed value, or `null` if missing |
-| `parse(key, value, ttl?)` | Get-or-set: returns `{ created, key, value }`. Stores via `set()`, so key flattening and value serialization apply |
+| `getOrSet(key, factory, ttl?)` | Returns a cached value, or calls the factory, stores its result, and returns that value |
+| `deleteKey(key)` | Deletes one key. Returns whether a key was deleted |
+| `exists(key)` | Returns whether the key exists |
+| `keys()` | Lists fully prefixed keys in this instance's namespace |
+| `clear()` | Deletes keys in this instance's namespace. Without a prefix, deletes all keys in the selected Redis database |
 | `_ping()` | Health check — resolves `'PONG'` |
 | `_close()` | Closes the connection gracefully |
 
